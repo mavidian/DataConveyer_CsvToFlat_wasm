@@ -1,0 +1,110 @@
+﻿@page "/"
+@using System.IO;
+@using Blazor.FileReader;
+@inject IFileReaderService fileReaderService;
+
+<h1>Data Conveyer in a web browser!</h1>
+<p>
+    This web application demonstrates versatility of Data Conveyer. The entire processing occurs inside a web
+    browser and no data is ever sent to the web server!
+</p>
+<p>
+    The application uses Data Conveyer to convert a CSV file to a flat (fixed-width field) file.
+    In addition, some records are removed from output.
+    The input file is expected to contain aircraft data along with IATA and ICAO codes, such as the
+    <a href="https://github.com/jpatokal/openflights/blob/master/data/planes.dat" target="_blank">planes.dat</a> file
+    (this file is licensed under <a href="https://github.com/jpatokal/openflights/blob/master/data/LICENSE" target="_blank">Open Database License</a>).
+</p>
+<p>
+    To run the application, select the input file and click the "Read and Convert Airplane Data" button.
+    Note that record processing is artificially slowed down to make the progress changes noticeable.
+</p>
+
+
+<p>
+    <input class="fileSelector" type="file" ref="inputTypeFileElement" title="Select Input File"/>
+</p>
+
+<div class="processStatus">
+    <button class="btn btn-primary" onclick="@ProcessFileAsync">Read and Convert Airplane Data</button>
+    <span>@Status</span>
+</div>
+
+<div class="textBlock input">
+    <p>Input Data:</p>
+    <textarea cols="80" rows="20" disabled>@InputData</textarea>
+</div>
+
+<div class="textBlock output">
+    <p>Output Data:</p>
+    <textarea cols="60" rows="20" disabled>@OutputData</textarea>
+</div>
+
+@functions {
+
+   ElementRef inputTypeFileElement;
+
+   string InputData { get; set; }
+   string OutputData { get; set; }
+   string Status { get; set; }
+   string Eol = Environment.NewLine;
+
+   StreamReader Reader;
+
+   public async Task ProcessFileAsync()
+   {
+
+       InputData = string.Empty;
+       OutputData = string.Empty;
+       Status = string.Empty;
+       this.StateHasChanged();
+
+       var processor = new DataProcessor(ProvideInputLineAsync, ReceiveOutputLine, ReportProgress);
+
+       var filesSelected = await fileReaderService.CreateReference(inputTypeFileElement).EnumerateFilesAsync();
+       using (var stream = await filesSelected.First().OpenReadAsync())
+       {
+           Reader = new StreamReader(stream);
+           ReportProgress(0);
+           var result = await processor.ProcessFileAsync();
+           Reader.Dispose();
+           Status = $"     Out of { result.RowsRead } input rows, { result.RowsWritten } were sent to output.";
+       }
+       this.StateHasChanged();
+   }
+
+   /// <summary>
+   /// Intake supplier (called by Data Conveyer)
+   /// </summary>
+   /// <returns></returns>
+   internal async Task<string> ProvideInputLineAsync()
+   {
+       var line = await Reader.ReadLineAsync();
+       InputData += line + Eol;
+       this.StateHasChanged();
+       await Task.Delay(3);  //simulate slow intake, so that progress (Status) changes are noticeable; can be removed.
+       return line;
+   }
+
+   /// <summary>
+   /// Output consumer (called by Data Conveyer)
+   /// </summary>
+   /// <param name="lineToAdd"></param>
+   internal void ReceiveOutputLine(string line)
+   {
+       if (line == null) { return; } //end of data
+       OutputData += line + Eol;
+       this.StateHasChanged();
+   }
+
+   /// <summary>
+   /// Called by Data Conveyer from progress event handlers.
+   /// </summary>
+   /// <param name="recordCount">Records on intake; 0 means just started</param>
+   internal void ReportProgress(int recordCount)
+   {
+       Status = "Processing... ";
+       if (recordCount > 0) { Status += $"{recordCount:N0} records read so far."; }
+       this.StateHasChanged();
+   }
+}
