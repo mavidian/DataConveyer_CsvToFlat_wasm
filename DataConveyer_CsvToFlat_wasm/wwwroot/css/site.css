@@ -136,6 +136,7 @@ app {
 
 .textBlock {
     display: inline-block;
+    max-width: 100%;
 }
 
 .input {
@@ -153,6 +154,7 @@ app {
         background-color: rgba(24, 113, 106, .1);
         font-size: smaller;
         border-radius: 4px;
+        max-width: 100%;
     }
 
 .output {
@@ -169,8 +171,9 @@ app {
         border-color: rgb(33, 73, 120);
         background-color: rgba(33, 73, 120, .1);
         font-size: smaller;
-        font-family:Courier New, Courier, monospace;
+        font-family: Courier New, Courier, monospace;
         border-radius: 4px;
+        max-width: 100%;
     }
 
 h1, h2, h3, h4 {
