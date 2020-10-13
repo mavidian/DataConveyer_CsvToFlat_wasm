@@ -21,7 +21,7 @@
 </p>
 
 <p>
-    <input class="fileSelector" type="file" @ref="inputTypeFileElement" title="Select Input File" />
+    <input class="fileSelector" type="file" @onclick="() => Status = string.Empty" @ref="inputTypeFileElement" title="Select Input File" />
 </p>
 
 <div class="processStatus">
@@ -41,70 +41,77 @@
 
 @code {
 
-    ElementReference inputTypeFileElement;
+   ElementReference inputTypeFileElement;
 
-    string InputData { get; set; }
-    string OutputData { get; set; }
-    string Status { get; set; }
-    string Eol = Environment.NewLine;
+   string InputData { get; set; }
+   string OutputData { get; set; }
+   string Status { get; set; }
+   string Eol = Environment.NewLine;
 
-    StreamReader Reader;
+   StreamReader Reader;
 
-    private async Task ProcessFileAsync()
-    {
+   private async Task ProcessFileAsync()
+   {
 
-        InputData = string.Empty;
-        OutputData = string.Empty;
-        Status = string.Empty;
-        this.StateHasChanged();
+       InputData = string.Empty;
+       OutputData = string.Empty;
+       Status = string.Empty;
+       this.StateHasChanged();
 
-        var processor = new DataProcessor(ProvideInputLineAsync, ReceiveOutputLine, ReportProgress);
+       var processor = new DataProcessor(ProvideInputLineAsync, ReceiveOutputLine, ReportProgress);
 
-        var filesSelected = await fileReaderService.CreateReference(inputTypeFileElement).EnumerateFilesAsync();
-        using (var stream = await filesSelected.First().OpenReadAsync())
-        {
-            Reader = new StreamReader(stream);
-            ReportProgress(0);
-            var result = await processor.ProcessFileAsync();
-            Reader.Dispose();
-            Status = $"     Out of { result.RowsRead } input rows, { result.RowsWritten } were sent to output.";
-        }
-        this.StateHasChanged();
-    }
+       var fileSelected = (await fileReaderService.CreateReference(inputTypeFileElement).EnumerateFilesAsync()).FirstOrDefault();
+       if (fileSelected == null)
+       {
+           Status = "No file chosen. Please choose a file to process and try again.";
+       }
+       else
+       {
+           using (var stream = await fileSelected.OpenReadAsync())
+           {
+               Reader = new StreamReader(stream);
+               ReportProgress(0);
+               var result = await processor.ProcessFileAsync();
+               Reader.Dispose();
+               Status = $"     Out of { result.RowsRead } input rows, { result.RowsWritten } were sent to output.";
+           }
+       }
+       this.StateHasChanged();
+   }
 
-    /// <summary>
-    /// Intake supplier (called by Data Conveyer)
-    /// </summary>
-    /// <returns></returns>
-    internal async Task<string> ProvideInputLineAsync()
-    {
-        var line = await Reader.ReadLineAsync();
-        InputData += line + Eol;
-        this.StateHasChanged();
-        await Task.Delay(3);  //simulate slow intake, so that progress (Status) changes are noticeable; can be removed.
-        return line;
-    }
+   /// <summary>
+   /// Intake supplier (called by Data Conveyer)
+   /// </summary>
+   /// <returns></returns>
+   internal async Task<string> ProvideInputLineAsync()
+   {
+       var line = await Reader.ReadLineAsync();
+       InputData += line + Eol;
+       this.StateHasChanged();
+       await Task.Delay(3);  //simulate slow intake, so that progress (Status) changes are noticeable; can be removed.
+       return line;
+   }
 
-    /// <summary>
-    /// Output consumer (called by Data Conveyer)
-    /// </summary>
-    /// <param name="lineToAdd"></param>
-    internal void ReceiveOutputLine(string line)
-    {
-        if (line == null) { return; } //end of data
-        OutputData += line + Eol;
-        this.StateHasChanged();
-    }
+   /// <summary>
+   /// Output consumer (called by Data Conveyer)
+   /// </summary>
+   /// <param name="lineToAdd"></param>
+   internal void ReceiveOutputLine(string line)
+   {
+       if (line == null) { return; } //end of data
+       OutputData += line + Eol;
+       this.StateHasChanged();
+   }
 
-    /// <summary>
-    /// Called by Data Conveyer from progress event handlers.
-    /// </summary>
-    /// <param name="recordCount">Records on intake; 0 means just started</param>
-    internal void ReportProgress(int recordCount)
-    {
-        Status = "Processing... ";
-        if (recordCount > 0) { Status += $"{recordCount:N0} records read so far."; }
-        this.StateHasChanged();
-    }
+   /// <summary>
+   /// Called by Data Conveyer from progress event handlers.
+   /// </summary>
+   /// <param name="recordCount">Records on intake; 0 means just started</param>
+   internal void ReportProgress(int recordCount)
+   {
+       Status = "Processing... ";
+       if (recordCount > 0) { Status += $"{recordCount:N0} records read so far."; }
+       this.StateHasChanged();
+   }
 }
 
